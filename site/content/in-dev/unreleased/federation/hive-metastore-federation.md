@@ -147,9 +147,9 @@ obtain tokens that authorize against the federated metadata.
 
 `default-base-location` is required; it tells Polaris and Iceberg where to place new metadata files.
 `allowedLocations` is optional—supply it only when you want to restrict writers to a specific set of
-prefixes. If your IAM trust policy requires an `externalId` or explicit `userArn`, include those
-optional fields in `storageConfigInfo`. Polaris persists them and supplies them when assuming the
-role cited by `roleArn` during metadata commits.
+prefixes. If your IAM trust policy requires an `externalId`, include that optional field in
+`storageConfigInfo`. Polaris persists it and supplies it when assuming the role cited by `roleArn`
+during metadata commits. `userArn` is output-only; Polaris ignores any value sent in requests.
 
 ## Limitations and operational notes
 

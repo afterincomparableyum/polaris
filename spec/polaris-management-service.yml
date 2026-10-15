@@ -1138,7 +1138,8 @@ components:
               description: an optional external id used to establish a trust relationship with AWS in the trust policy
             userArn:
               type: string
-              description: the aws user arn used to assume the aws role
+              readOnly: true
+              description: Output-only. The aws user arn used to assume the aws role. Polaris ignores any value sent in requests.
               example: "arn:aws:iam::123456789001:user/abc1-b-self1234"
             currentKmsKey:
               type: string
