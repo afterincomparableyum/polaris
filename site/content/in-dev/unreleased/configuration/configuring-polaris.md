@@ -92,14 +92,21 @@ Please refer to the [Quarkus documentation](https://quarkus.io/guides/) for more
 | `quarkus.log.level`                               | `INFO`                   | Define the root log level.                                                                     |
 | `quarkus.log.category."org.apache.polaris".level` |                          | Define the log level for a specific category.                                                  |
 | `quarkus.default-locale`                          | System locale            | Force the use of a specific locale, for instance `en_US`.                                      |
+| `quarkus.http.host`                               | `0.0.0.0`                | Define the host address the HTTP server binds to.                                              |
 | `quarkus.http.port`                               | `8181`                   | Define the HTTP port number.                                                                   |
 | `quarkus.http.auth.basic`                         | `false`                  | Enable the HTTP basic authentication.                                                          |
 | `quarkus.http.limits.max-body-size`               | `10240K`                 | Define the HTTP max body size limit.                                                           |
 | `quarkus.http.cors.enabled`                       | `false`                  | Enable the HTTP CORS filter. Must be set to `true` for any other CORS property to take effect. |
 | `quarkus.management.enabled`                      | `true`                   | Enable the management server.                                                                  |
+| `quarkus.management.host`                         | `0.0.0.0`                | Define the host address the Polaris management server binds to.                                |
 | `quarkus.management.port`                         | `8182`                   | Define the port number of the Polaris management server.                                       |
 | `quarkus.management.root-path`                    |                          | Define the root path where `/metrics` and `/health` endpoints are based on.                    |
 | `quarkus.otel.sdk.disabled`                       | `true`                   | Enable the OpenTelemetry layer.                                                                |
+
+{{< alert note >}}
+`quarkus.management.host` does not inherit the value of `quarkus.http.host`. To bind Polaris to a
+different address, for instance `[::]` to listen on IPv6, set both properties.
+{{< /alert >}}
 
 ## JVM Configuration Options
 

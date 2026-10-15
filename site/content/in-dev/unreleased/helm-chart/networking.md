@@ -79,6 +79,14 @@ managementService:
       protocol: TCP
 ```
 
+The management server binds to its own host address, which does not inherit `quarkus.http.host`. For example, to listen on IPv6, set both hosts using `advancedConfig`:
+
+```yaml
+advancedConfig:
+  quarkus.http.host: "[::]"
+  quarkus.management.host: "[::]"
+```
+
 ### Extra Services
 
 You can define additional services using `extraServices`. This is useful when you need to expose the same pods with different service configurations, such as exposing the API via a LoadBalancer in addition to the default ClusterIP service.
