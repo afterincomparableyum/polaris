@@ -20,6 +20,8 @@ package org.apache.polaris.core;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import org.apache.polaris.core.entity.PolarisEntity;
+import org.apache.polaris.core.entity.PolarisEntityType;
 import org.junit.jupiter.api.Test;
 
 class PolarisDefaultDiagServiceImplTest {
@@ -44,5 +46,21 @@ class PolarisDefaultDiagServiceImplTest {
         .hasMessageContaining("42")
         .hasMessageContaining("foo.txt")
         .hasMessageNotContaining("[Ljava.lang.Object");
+  }
+
+  @Test
+  void testCheckDoesNotRenderEntityInternalProperties() {
+    PolarisEntity entity =
+        new PolarisEntity.Builder()
+            .setType(PolarisEntityType.CATALOG)
+            .setId(42L)
+            .setName("my_catalog")
+            .addInternalProperty("internal-key", "internal-value")
+            .build();
+    assertThatThrownBy(() -> diagnostics.check(false, "someSignature", "entity={}", entity))
+        .hasMessageContaining("someSignature")
+        .hasMessageContaining("my_catalog")
+        .hasMessageNotContaining("internal-key")
+        .hasMessageNotContaining("internal-value");
   }
 }

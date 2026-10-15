@@ -184,6 +184,10 @@ public class PolarisEntity extends PolarisBaseEntity {
     return PolarisEntitySubType.fromCode(getSubTypeCode());
   }
 
+  /**
+   * Note: internal properties are intentionally omitted, since they may hold sensitive
+   * configuration and this string can end up in log and exception messages.
+   */
   @Override
   public String toString() {
     return "name="
@@ -197,9 +201,7 @@ public class PolarisEntity extends PolarisBaseEntity {
         + ";type="
         + getType()
         + ";subType="
-        + getSubType()
-        + ";internalProperties="
-        + getInternalPropertiesAsMap();
+        + getSubType();
   }
 
   @Override
