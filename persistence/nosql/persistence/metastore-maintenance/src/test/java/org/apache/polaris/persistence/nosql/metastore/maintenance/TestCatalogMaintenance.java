@@ -31,6 +31,7 @@ import static org.apache.polaris.persistence.nosql.api.index.IndexContainer.newU
 import static org.apache.polaris.persistence.nosql.api.index.IndexKey.INDEX_KEY_SERIALIZER;
 import static org.apache.polaris.persistence.nosql.api.obj.ObjRef.OBJ_REF_SERIALIZER;
 import static org.apache.polaris.persistence.nosql.api.obj.ObjRef.objRef;
+import static org.apache.polaris.persistence.nosql.coretypes.catalog.CatalogRolesObj.CATALOG_ROLES_REF_NAME_PATTERN;
 import static org.apache.polaris.persistence.nosql.coretypes.catalog.CatalogStateObj.CATALOG_STATE_REF_NAME_PATTERN;
 import static org.apache.polaris.persistence.nosql.coretypes.catalog.CatalogsObj.CATALOGS_REF_NAME;
 import static org.apache.polaris.persistence.nosql.coretypes.catalog.EntityIdSet.ENTITY_ID_SET_SERIALIZER;
@@ -42,6 +43,7 @@ import static org.apache.polaris.persistence.nosql.coretypes.realm.RealmGrantsOb
 import static org.apache.polaris.persistence.nosql.coretypes.refs.References.realmReferenceNames;
 import static org.apache.polaris.persistence.nosql.maintenance.impl.MutableMaintenanceConfig.GRACE_TIME;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForClassTypes.fail;
 
 import io.smallrye.common.annotation.Identifier;
@@ -63,6 +65,7 @@ import org.apache.polaris.core.context.RealmContext;
 import org.apache.polaris.core.entity.CatalogEntity;
 import org.apache.polaris.core.entity.PolarisBaseEntity;
 import org.apache.polaris.core.entity.PolarisEntity;
+import org.apache.polaris.core.entity.PolarisEntityConstants;
 import org.apache.polaris.core.entity.PolarisPrivilege;
 import org.apache.polaris.core.entity.PrincipalEntity;
 import org.apache.polaris.core.persistence.MetaStoreManagerFactory;
@@ -79,6 +82,7 @@ import org.apache.polaris.persistence.nosql.api.Persistence;
 import org.apache.polaris.persistence.nosql.api.PersistenceParams;
 import org.apache.polaris.persistence.nosql.api.RealmPersistenceFactory;
 import org.apache.polaris.persistence.nosql.api.cache.CacheBackend;
+import org.apache.polaris.persistence.nosql.api.exceptions.ReferenceNotFoundException;
 import org.apache.polaris.persistence.nosql.api.index.IndexKey;
 import org.apache.polaris.persistence.nosql.api.obj.ObjRef;
 import org.apache.polaris.persistence.nosql.api.ref.Reference;
@@ -569,6 +573,55 @@ public class TestCatalogMaintenance {
     assertThat(cleanedGrants.isSuccess()).isTrue();
     assertThat(cleanedGrants.getGrantRecords()).isEmpty();
     assertThat(cleanedGrants.getEntities()).isEmpty();
+  }
+
+  @Test
+  public void readsTolerateGrantsToPurgedCatalogReferences() {
+    var testSetup = bootstrapRealm();
+    var manager = testSetup.manager();
+    var callCtx = testSetup.callCtx();
+    var persistence = testSetup.persistence();
+
+    var catalog = createCatalog(manager, callCtx, persistence);
+    mandatoryCatalogObjsForTestImpl(persistence, catalog.getId());
+
+    assertThat(manager.dropEntityIfExists(callCtx, null, catalog, null, false))
+        .extracting(BaseResult::isSuccess)
+        .isEqualTo(true);
+
+    // The first maintenance run purges the dropped catalog's references, but the grant of the
+    // catalog's admin role to service_admin is only removed by a later run.
+    mutableMonotonicClock.advanceBoth(GRACE_TIME);
+    assertThat(runMaintenance().success()).isTrue();
+
+    purgeBackendCache("");
+
+    assertThatThrownBy(
+            () ->
+                persistence.fetchReference(format(CATALOG_ROLES_REF_NAME_PATTERN, catalog.getId())))
+        .isInstanceOf(ReferenceNotFoundException.class);
+
+    // Check both the session that knew the catalog's references and a new one.
+    var newSession = metaStoreManagerFactory.getOrCreateSession(realmContext);
+    var newCallCtx = new PolarisCallContext(realmContext, newSession, configurationSource);
+    for (var ctx : List.of(callCtx, newCallCtx)) {
+      var serviceAdmin =
+          manager.loadResolvedEntityByName(
+              ctx,
+              0L,
+              0L,
+              PRINCIPAL_ROLE,
+              PolarisEntityConstants.getNameOfPrincipalServiceAdminRole());
+      assertThat(serviceAdmin.isSuccess()).isTrue();
+      assertThat(serviceAdmin.getEntityGrantRecords())
+          .noneMatch(grant -> grant.getSecurableCatalogId() == catalog.getId());
+
+      var grants = manager.loadGrantsToGrantee(ctx, serviceAdmin.getEntity());
+      assertThat(grants.isSuccess()).isTrue();
+      assertThat(grants.getGrantRecords())
+          .noneMatch(grant -> grant.getSecurableCatalogId() == catalog.getId());
+      assertThat(grants.getEntities()).noneMatch(e -> e.getCatalogId() == catalog.getId());
+    }
   }
 
   @Test

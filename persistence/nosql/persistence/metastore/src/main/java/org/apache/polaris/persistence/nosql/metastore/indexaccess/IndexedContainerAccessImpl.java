@@ -27,6 +27,7 @@ import com.google.common.base.Suppliers;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.apache.polaris.persistence.nosql.api.Persistence;
+import org.apache.polaris.persistence.nosql.api.exceptions.ReferenceNotFoundException;
 import org.apache.polaris.persistence.nosql.api.index.Index;
 import org.apache.polaris.persistence.nosql.api.index.IndexKey;
 import org.apache.polaris.persistence.nosql.api.obj.ObjRef;
@@ -77,8 +78,13 @@ final class IndexedContainerAccessImpl<C extends ContainerObj> extends IndexedCo
     if (r == null || referenceName == null) {
       return false;
     }
-    var current = persistence.fetchReference(referenceName);
-    return !r.map(ContainerObj::id).equals(current.pointer().map(ObjRef::id));
+    try {
+      var current = persistence.fetchReference(referenceName);
+      return !r.map(ContainerObj::id).equals(current.pointer().map(ObjRef::id));
+    } catch (ReferenceNotFoundException e) {
+      // A purged reference has no head, see refObj().
+      return r.isPresent();
+    }
   }
 
   @SuppressWarnings("OptionalAssignedToNull")
@@ -86,7 +92,13 @@ final class IndexedContainerAccessImpl<C extends ContainerObj> extends IndexedCo
   public Optional<C> refObj() {
     if (this.refObj == null) {
       if (referenceName != null) {
-        this.refObj = persistence.fetchReferenceHead(referenceName, referenceObjType);
+        try {
+          this.refObj = persistence.fetchReferenceHead(referenceName, referenceObjType);
+        } catch (ReferenceNotFoundException e) {
+          // Maintenance purges the references of dropped catalogs, but grants may still refer to
+          // their entities until a later maintenance run. Treat the container as empty.
+          this.refObj = Optional.empty();
+        }
         LOGGER.debug("Fetched head {} for reference '{}'", refObj, referenceName);
       } else if (containerObjRef != null) {
         this.refObj = Optional.ofNullable(persistence.fetch(containerObjRef, referenceObjType));
